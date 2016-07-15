@@ -1,0 +1,11 @@
+{
+    "compilerOptions": {
+    	"outFile": "built/bundle.js", 
+        "sourceMap": true, 
+        "target": "es5"
+    }, 
+    "files": [
+        "scripts\\backup.ts",
+        "scripts\\browser-backup.ts"
+    ]
+}
