@@ -1,5 +1,10 @@
 
 
+class FeedWriterData {
+	entries: any;
+	user: any;
+}
+
 interface HttpDataProvider {
 	fetch(url: string, complete: (data: any, isSuccessful: boolean) => void): void;
 }
@@ -10,7 +15,7 @@ interface BackupReporter {
 }
 
 interface FeedWriter {
-	writeAll(data: any[], complete: (result: any) => void): void;
+	writeAll(data: FeedWriterData, complete: (result: any) => void): void;
 }
 
 class Config {
@@ -22,7 +27,9 @@ class Config {
 
 class Backup {
 
-	private entries: any[];
+	private entries: any[] = new Array<any>();
+
+	private userData: any;
 
 	private dataProvider:HttpDataProvider;
 
@@ -32,7 +39,6 @@ class Backup {
 
 	public constructor()
 	{
-		this.entries = new Array<any>();
 	}
 
 	public setDataProvider(dataProvider:HttpDataProvider): void {
@@ -63,6 +69,7 @@ class Backup {
 	public processProfileData = (data: any, isSuccessful: boolean) => {
 		if(isSuccessful) {
 			console.log(data);
+			this.userData = data.user;
 			this.reporter.report(`Profile read: ${data.user.name}`, 'profile');
 			this.readFeedUrl(this.buildAPIUrl(`${data.user.name}.json`));
 		}
@@ -70,7 +77,11 @@ class Backup {
 
 	public processFeedData = (data: any, isSuccessful: boolean) => {
 		if(isSuccessful) {
-			this.entries.push(data.entries);
+			console.log('pre - n' +  data.entries.length);			
+			this.normalizeData(data);
+			console.log('post - n' +  data.entries.length);			
+			this.entries = this.entries.concat(data.entries);
+			console.log('concat' +  this.entries.length);			
 		}
 		if(data.precise_older_entries_url == null) {
 			this.feedDataCompleted();
@@ -81,21 +92,29 @@ class Backup {
 		}
 	}
 
+	private normalizeData = (data: any): any => {
+		data.entries.forEach(e => {
+			e.comments.forEach(c => {
+				c.user = data.users[c.user_id];
+			});
+		});
+	}
+
 	private feedDataCompleted = () => {
 		this.reporter.report(`Feed data completed: total of ${this.entries.length} entries`, 'complete');
+		this.writeEntries();
 	}
 
 	private writeEntries(): void {
 		this.reporter.report(`Feed data is being written ...`, 'writer');
-		this.writer.writeAll(this.entries, this.feedWritingComplete);
+		var data:FeedWriterData = new FeedWriterData();
+		data.entries = this.entries;
+		data.user = this.userData;
+		this.writer.writeAll(data, this.feedWritingComplete);
 	}
 
 	public feedWritingComplete = (result: any) => {
 		this.reporter.report(`Feed data writing complete`, 'writer');
-	}
-
-	public result(): void {
-		alert('xxxx');
 	}
 
 }

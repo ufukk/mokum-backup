@@ -1,0 +1,43 @@
+<html>
+<head>
+</head>
+
+<body>
+<h1>Mokum.place data for <span id="username">{{ user.name }}</span></h1>
+
+<div id="entries">
+
+{{#entries}}
+
+<div class="entry">
+
+<div class="title">{{ text }}</div>
+<div class="attachments">
+	{{#attachments}}
+	<div class="item">
+	<img src="{{ medium_url }}" />
+	</div>
+	{{/attachments}}
+</div>
+<div class="comments">
+	{{#comments}}
+		<div class="item">
+		<div class="user">
+			<div class="avatar"><img src="http://mokum.place{{ user.avatar_url }}" /></div>
+			<div class="name">{{ user.display_name }} ({{ user.name }}) </div>
+		</div>
+		<div class="text">{{ text }}</div>
+		</div>
+	{{/comments}}
+</div>
+
+
+</div>
+
+{{/entries}}
+
+</div>
+
+
+</body>
+</html>

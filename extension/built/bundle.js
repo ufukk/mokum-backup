@@ -1,3 +1,8 @@
+var FeedWriterData = (function () {
+    function FeedWriterData() {
+    }
+    return FeedWriterData;
+}());
 var Config = (function () {
     function Config() {
     }
@@ -10,16 +15,22 @@ var Config = (function () {
 var Backup = (function () {
     function Backup() {
         var _this = this;
+        this.entries = new Array();
         this.processProfileData = function (data, isSuccessful) {
             if (isSuccessful) {
                 console.log(data);
+                _this.userData = data.user;
                 _this.reporter.report("Profile read: " + data.user.name, 'profile');
                 _this.readFeedUrl(_this.buildAPIUrl(data.user.name + ".json"));
             }
         };
         this.processFeedData = function (data, isSuccessful) {
             if (isSuccessful) {
-                _this.entries.push(data.entries);
+                console.log('pre - n' + data.entries.length);
+                _this.normalizeData(data);
+                console.log('post - n' + data.entries.length);
+                _this.entries = _this.entries.concat(data.entries);
+                console.log('concat' + _this.entries.length);
             }
             if (data.precise_older_entries_url == null) {
                 _this.feedDataCompleted();
@@ -30,13 +41,20 @@ var Backup = (function () {
                 _this.readFeedUrl(_this.buildAPIUrl(data.precise_older_entries_url));
             }
         };
+        this.normalizeData = function (data) {
+            data.entries.forEach(function (e) {
+                e.comments.forEach(function (c) {
+                    c.user = data.users[c.user_id];
+                });
+            });
+        };
         this.feedDataCompleted = function () {
             _this.reporter.report("Feed data completed: total of " + _this.entries.length + " entries", 'complete');
+            _this.writeEntries();
         };
         this.feedWritingComplete = function (result) {
             _this.reporter.report("Feed data writing complete", 'writer');
         };
-        this.entries = new Array();
     }
     Backup.prototype.setDataProvider = function (dataProvider) {
         this.dataProvider = dataProvider;
@@ -59,15 +77,17 @@ var Backup = (function () {
     };
     Backup.prototype.writeEntries = function () {
         this.reporter.report("Feed data is being written ...", 'writer');
-        this.writer.writeAll(this.entries, this.feedWritingComplete);
-    };
-    Backup.prototype.result = function () {
-        alert('xxxx');
+        var data = new FeedWriterData();
+        data.entries = this.entries;
+        data.user = this.userData;
+        this.writer.writeAll(data, this.feedWritingComplete);
     };
     return Backup;
 }());
-/// <reference path="jquery.d.ts" />
+/// <reference path="references/jquery.d.ts" />
 /// <reference path="backup.ts" />
+/// <reference path="references/mustache.d.ts" />
+/// <reference path="references/chrome-app.d.ts" />
 var JQueryHttpDataProvider = (function () {
     function JQueryHttpDataProvider() {
     }
@@ -97,6 +117,42 @@ var ConsoleFeedWriter = (function () {
     };
     return ConsoleFeedWriter;
 }());
+var HtmlFeedWriter = (function () {
+    function HtmlFeedWriter() {
+        var _this = this;
+        this.getFilePath = function () {
+            return "backup.html";
+        };
+        this.getHtml = function (data, complete) {
+            $.get('template.html', function (template) {
+                complete(Mustache.render(template, data));
+            });
+        };
+        this.writeToFile = function (content, complete) {
+            chrome.fileSystem.chooseEntry({ type: 'saveFile', suggestedName: 'mokum-backup.html' }, function (entry) {
+                chrome.fileSystem.getWritableEntry(entry, function (writableEntry) {
+                    var fileEntry = writableEntry;
+                    var blob = new Blob(new Array(content));
+                    fileEntry.createWriter(function (writer) {
+                        writer.write(blob);
+                        complete(true, null);
+                    }, function (error) {
+                        console.log(error);
+                        complete(false, error);
+                    });
+                });
+            });
+        };
+        this.writeAll = function (data, complete) {
+            var f = _this;
+            console.log("entry count: " + data.entries.length);
+            _this.getHtml(data, function (result) {
+                f.writeToFile(result, complete);
+            });
+        };
+    }
+    return HtmlFeedWriter;
+}());
 var HtmlBackupReporter = (function () {
     function HtmlBackupReporter() {
         this.elId = '#report-feed';
@@ -116,7 +172,7 @@ var BrowserBackupRunner = (function () {
         this.backupInstance = new Backup();
         this.backupInstance.setDataProvider(new JQueryHttpDataProvider());
         this.backupInstance.setReporter(new HtmlBackupReporter());
-        this.backupInstance.setWriter(new ConsoleFeedWriter());
+        this.backupInstance.setWriter(new HtmlFeedWriter());
     }
     BrowserBackupRunner.prototype.start = function () {
         this.backupInstance.readInitialUrl();

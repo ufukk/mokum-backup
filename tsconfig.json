@@ -1,6 +1,6 @@
 {
     "compilerOptions": {
-    	"outFile": "built/bundle.js", 
+    	"outFile": "extension/built/bundle.js", 
         "sourceMap": true, 
         "target": "es5"
     }, 
